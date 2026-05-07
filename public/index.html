@@ -90,7 +90,7 @@ table.sheet tr.na-row td{background:#fafafa;color:#aaa}
 <script>
 // ============================================================
 // PASTE YOUR ANTHROPIC API KEY BETWEEN THE QUOTES BELOW
-const ANTHROPIC_API_KEY = "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";
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 // ============================================================
 const MAX=10;
 const ZONES=[
@@ -98,7 +98,7 @@ const ZONES=[
   {id:"pricelist",label:"2020 Price List",icon:"📊",optional:true,hint:".xlsx · .xls · .csv · .pdf · .png",accept:".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg"},
   {id:"acknowledgement",label:"Cabinet Acknowledgement",icon:"📋",optional:true,hint:".pdf · .xlsx · .png",accept:".pdf,.xlsx,.xls,.png,.jpg,.jpeg"},
 ];
-const state={layout:[],pricelist:[],acknowledgement:[],apiKey:ANTHROPIC_API_KEY};
+const state={layout:[],pricelist:[],acknowledgement:[]};
 
 
 
