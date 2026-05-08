@@ -9,6 +9,16 @@ app.use(express.static(path.join(__dirname, "public")));
 console.log("API key exists:", !!apiKey);
 console.log("API key prefix:", apiKey?.substring(0, 15));
 
+app.get("/api/debug-key", (req, res) => {
+  const key = process.env.ANTHROPIC_API_KEY || "";
+  res.json({
+    exists: !!key,
+    length: key.length,
+    startsWith: key.substring(0, 12),
+    hasSpaces: key !== key.trim()
+  });
+});
+
 // Proxy endpoint — keeps API key server-side
 app.post("/api/check", async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
