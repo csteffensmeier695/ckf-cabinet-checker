@@ -195,7 +195,10 @@ document.getElementById("run-btn").addEventListener("click",async()=>{
   document.getElementById("summary").style.display="none";
   document.getElementById("results-title").style.display="none";
   document.getElementById("results-list").innerHTML="";
-  if(!state.apiKey){errBox.textContent="Please enter and save your Anthropic API key first.";errBox.style.display="block";return;}
+  if(!state.layout.length&&!state.pricelist.length&&!state.acknowledgement.length){
+    errBox.textContent="Please upload at least one file before running the check.";
+    errBox.style.display="block";return;
+  }
   const btn=document.getElementById("run-btn");
   btn.disabled=true;btn.textContent="Analyzing files…";
 
