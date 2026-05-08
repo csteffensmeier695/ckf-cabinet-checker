@@ -6,18 +6,20 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
+console.log("API key exists:", !!apiKey);
+console.log("API key prefix:", apiKey?.substring(0, 15));
+
 // Proxy endpoint — keeps API key server-side
 app.post("/api/check", async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: { message: "API key not configured on server." } });
 
   const body = JSON.stringify({
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-sonnet-4-5",
     max_tokens: 8000,
     system: req.body.system,
     messages: req.body.messages,
   });
-
   const options = {
     hostname: "api.anthropic.com",
     path: "/v1/messages",
