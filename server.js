@@ -6,15 +6,15 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/api/debug-key", (req, res) => {
-  const key = process.env.ANTHROPIC_API_KEY || "";
-  res.json({
-    exists: !!key,
-    length: key.length,
-    startsWith: key.substring(0, 12),
-    hasSpaces: key !== key.trim()
-  });
-});
+//app.get("/api/debug-key", (req, res) => {
+ //const key = process.env.ANTHROPIC_API_KEY || "";
+ // res.json({
+  //  exists: !!key,
+  //  length: key.length,
+  //  startsWith: key.substring(0, 12),
+  //  hasSpaces: key !== key.trim()
+ // });
+//});
 
 app.post("/api/check", async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
