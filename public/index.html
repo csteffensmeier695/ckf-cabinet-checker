@@ -11,6 +11,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;ba
 h1{font-size:22px;font-weight:500;margin-bottom:4px}
 .subtitle{font-size:13px;color:#666;margin-bottom:20px}
 
+#api-bar{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#api-bar label{font-size:13px;font-weight:500;white-space:nowrap}
+#api-key-input{flex:1;min-width:200px;font-size:13px;padding:6px 10px;border:1px solid #ccc;border-radius:6px;font-family:monospace}
+#save-key-btn{font-size:12px;padding:6px 14px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer}
+#key-status{font-size:12px;color:#16a34a}
+
 .upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
 .zone-col{display:flex;flex-direction:column;gap:6px}
 .drop-zone{border:1.5px dashed #ccc;border-radius:10px;padding:14px 10px;cursor:pointer;background:#fff;text-align:center;transition:background 0.15s,border-color 0.15s}
@@ -32,7 +38,7 @@ h1{font-size:22px;font-weight:500;margin-bottom:4px}
 #run-btn{width:100%;padding:11px 0;font-size:14px;font-weight:500;border:1.5px solid #111;border-radius:8px;background:#111;color:#fff;cursor:pointer;margin-bottom:20px;transition:opacity 0.15s}
 #run-btn:disabled{opacity:0.4;cursor:not-allowed}
 
-#error-box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#b91c1c;display:none;white-space:pre-wrap}
+#error-box{background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#b91c1c;display:none}
 
 #summary{display:none;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
 .stat-card{background:#fff;border:0.5px solid #e0e0e0;border-radius:8px;padding:10px 12px}
@@ -42,6 +48,7 @@ h1{font-size:22px;font-weight:500;margin-bottom:4px}
 
 #results-title{font-size:13px;font-weight:600;letter-spacing:.04em;color:#555;margin-bottom:10px;display:none;text-transform:uppercase}
 
+/* Spreadsheet table */
 .sheet-wrap{overflow-x:auto;margin-bottom:24px}
 table.sheet{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #ddd;border-radius:8px;overflow:hidden}
 table.sheet th{background:#111;color:#fff;padding:8px 12px;text-align:left;font-weight:500;font-size:11px;white-space:nowrap}
@@ -51,6 +58,7 @@ table.sheet tr:last-child td{border-bottom:none}
 table.sheet tr.match-row td{background:#fff}
 table.sheet tr.mismatch-row td{background:#fff8f8}
 table.sheet tr.design-row td{background:#fffbf0}
+table.sheet tr.na-row td{background:#fafafa;color:#aaa}
 .sku-cell{font-weight:600;font-family:monospace;font-size:12px}
 .desc-cell{color:#444;max-width:200px}
 .src-cell{text-align:center;font-size:14px}
@@ -62,12 +70,8 @@ table.sheet tr.design-row td{background:#fffbf0}
 .badge-dim{background:#F4C0D1;color:#72243E}
 .badge-missing{background:#F7C1C1;color:#791F1F}
 .badge-design{background:#E5E7EB;color:#374151}
+.badge-ok{background:#D1FAE5;color:#065F46}
 .match-icon{font-size:13px}
-
-@media(max-width:800px){
-  .upload-grid{grid-template-columns:1fr}
-  #summary{grid-template-columns:repeat(2,1fr)}
-}
 </style>
 </head>
 <body>
@@ -84,98 +88,72 @@ table.sheet tr.design-row td{background:#fffbf0}
 </div>
 
 <script>
+// API key is stored securely on the server — no key needed here
 const MAX=10;
-const MAX_TEXT_CHARS=120000;
-
 const ZONES=[
   {id:"layout",label:"Cabinet Layout",icon:"📐",optional:true,hint:".pdf · .png · .jpg",accept:".pdf,.png,.jpg,.jpeg"},
-  {id:"pricelist",label:"2020 Price List",icon:"📊",optional:true,hint:".csv · .pdf · .png · .jpg",accept:".csv,.txt,.pdf,.png,.jpg,.jpeg"},
-  {id:"acknowledgement",label:"Cabinet Acknowledgement",icon:"📋",optional:true,hint:".pdf · .csv · .png · .jpg",accept:".pdf,.csv,.txt,.png,.jpg,.jpeg"},
+  {id:"pricelist",label:"2020 Price List",icon:"📊",optional:true,hint:".xlsx · .xls · .csv · .pdf · .png",accept:".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg"},
+  {id:"acknowledgement",label:"Cabinet Acknowledgement",icon:"📋",optional:true,hint:".pdf · .xlsx · .png",accept:".pdf,.xlsx,.xls,.png,.jpg,.jpeg"},
 ];
-
 const state={layout:[],pricelist:[],acknowledgement:[]};
+
+
 
 function extIcon(name){
   const n=(name||"").toLowerCase();
   if(n.endsWith(".pdf"))return"📄";
   if(n.match(/\.(png|jpg|jpeg)$/))return"🖼";
-  if(n.match(/\.(csv|txt)$/))return"📃";
   if(n.match(/\.(xlsx|xls)$/))return"📗";
+  if(n.endsWith(".csv"))return"📃";
   return"📁";
-}
-
-function escapeHtml(value){
-  return String(value ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
 }
 
 function renderGrid(){
   const grid=document.getElementById("upload-grid");
   grid.innerHTML="";
-
   ZONES.forEach(z=>{
     const files=state[z.id];
-    const col=document.createElement("div");
-    col.className="zone-col";
-
-    const dz=document.createElement("div");
-    dz.className="drop-zone";
+    const col=document.createElement("div");col.className="zone-col";
+    const dz=document.createElement("div");dz.className="drop-zone";
     dz.innerHTML=`<div class="dz-icon">${z.icon}</div>
       <div class="dz-label">${z.label}<span class="optional"> (optional)</span></div>
       <div class="dz-hint">${files.length>=MAX?`Max ${MAX} files`:files.length?"drop or click to add more":z.hint}</div>`;
-
     const inp=document.createElement("input");
-    inp.type="file";
-    inp.multiple=true;
-    inp.accept=z.accept;
-    inp.style.display="none";
+    inp.type="file";inp.multiple=true;inp.accept=z.accept;inp.style.display="none";
     inp.addEventListener("change",()=>{addFiles(z.id,[...inp.files]);inp.value="";});
-
     dz.appendChild(inp);
     dz.addEventListener("click",()=>files.length<MAX&&inp.click());
     dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
     dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
     dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("drag");addFiles(z.id,[...e.dataTransfer.files]);});
     col.appendChild(dz);
-
     for(let i=0;i<MAX;i++){
       const f=files[i];
       const slot=document.createElement("div");
       slot.className="file-slot"+(f?"":" empty");
       if(f){
         slot.innerHTML=`<span class="fi">${extIcon(f.name)}</span>
-          <div class="finfo"><div class="fname" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div><div class="fsize">${(f.size/1024).toFixed(0)} KB</div></div>
+          <div class="finfo"><div class="fname" title="${f.name}">${f.name}</div><div class="fsize">${(f.size/1024).toFixed(0)} KB</div></div>
           <button class="rm" data-zone="${z.id}" data-idx="${i}">✕</button>`;
       } else {
         slot.innerHTML=`<span class="slot-label">file ${i+1}</span>`;
       }
       col.appendChild(slot);
     }
-
     grid.appendChild(col);
   });
-
   document.querySelectorAll(".rm").forEach(btn=>{
     btn.addEventListener("click",()=>{
-      state[btn.dataset.zone].splice(parseInt(btn.dataset.idx,10),1);
-      renderGrid();
-      updateBtn();
+      state[btn.dataset.zone].splice(parseInt(btn.dataset.idx),1);
+      renderGrid();updateBtn();
     });
   });
 }
 
 function addFiles(zid,incoming){
   const ex=state[zid];
-  const toAdd=incoming
-    .filter(f=>!ex.some(x=>x.name===f.name&&x.size===f.size))
-    .slice(0,MAX-ex.length);
-  state[zid].push(...toAdd);
-  renderGrid();
-  updateBtn();
+  const toAdd=incoming.filter(f=>!ex.some(x=>x.name===f.name&&x.size===f.size)).slice(0,MAX-ex.length);
+  state[zid].push(...toAdd);renderGrid();updateBtn();
 }
 
 function updateBtn(){
@@ -188,76 +166,38 @@ renderGrid();
 function fileToBase64(file){
   return new Promise((res,rej)=>{
     const r=new FileReader();
-    r.onload=()=>res(String(r.result).split(",")[1]);
+    r.onload=()=>res(r.result.split(",")[1]);
     r.onerror=rej;
     r.readAsDataURL(file);
-  });
-}
-
-function fileToText(file){
-  return new Promise((res,rej)=>{
-    const r=new FileReader();
-    r.onload=()=>res(String(r.result));
-    r.onerror=rej;
-    r.readAsText(file);
   });
 }
 
 async function buildBlocks(file,role){
   const parts=[];
   const mt=file.type||"";
-  const name=file.name.toLowerCase();
-
-  if(mt.startsWith("image/") || name.match(/\.(png|jpg|jpeg)$/)){
+  if(mt.startsWith("image/")){
     const b64=await fileToBase64(file);
-    parts.push({type:"image",source:{type:"base64",media_type:mt || (name.endsWith(".png") ? "image/png" : "image/jpeg"),data:b64}});
+    parts.push({type:"image",source:{type:"base64",media_type:mt,data:b64}});
     parts.push({type:"text",text:`Above is ${role} file: "${file.name}".`});
-    return parts;
-  }
-
-  if(mt==="application/pdf" || name.endsWith(".pdf")){
+  } else if(mt==="application/pdf"||file.name.toLowerCase().endsWith(".pdf")){
     const b64=await fileToBase64(file);
     parts.push({type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}});
     parts.push({type:"text",text:`Above is ${role} file: "${file.name}".`});
-    return parts;
+  } else {
+    parts.push({type:"text",text:`File "${file.name}" is a spreadsheet for ${role}.`});
   }
-
-  if(name.endsWith(".csv") || name.endsWith(".txt")){
-    let txt=await fileToText(file);
-    if(txt.length>MAX_TEXT_CHARS){
-      txt=txt.slice(0,MAX_TEXT_CHARS)+"\n\n[TRUNCATED: file was too large]";
-    }
-    parts.push({type:"text",text:`${role} spreadsheet/text file: "${file.name}"\n\n${txt}`});
-    return parts;
-  }
-
-  parts.push({type:"text",text:`Unsupported file type for direct reading: "${file.name}". Please upload this as PDF, image, CSV, or TXT.`});
   return parts;
-}
-
-function extractJson(text){
-  const cleaned=String(text || "").replace(/```json|```/g,"").trim();
-  try { return JSON.parse(cleaned); } catch(e) {}
-
-  const first=cleaned.indexOf("{");
-  const last=cleaned.lastIndexOf("}");
-  if(first>=0 && last>first){
-    return JSON.parse(cleaned.slice(first,last+1));
-  }
-  throw new Error("The AI response was not valid JSON. Try again or reduce the number of uploaded files.");
 }
 
 document.getElementById("run-btn").addEventListener("click",async()=>{
   const errBox=document.getElementById("error-box");
   errBox.style.display="none";
-  errBox.textContent="";
   document.getElementById("summary").style.display="none";
   document.getElementById("results-title").style.display="none";
   document.getElementById("results-list").innerHTML="";
-
+  if(!state.apiKey){errBox.textContent="Please enter and save your Anthropic API key first.";errBox.style.display="block";return;}
   const btn=document.getElementById("run-btn");
-  btn.disabled=true;
-  btn.textContent="Analyzing files…";
+  btn.disabled=true;btn.textContent="Analyzing files…";
 
   try{
     const content=[];
@@ -290,10 +230,10 @@ CRITICAL RULES FOR ACCURACY:
 4. END PANELS / BASE END SKINS: Check if end panels, finished ends, or base end skins appear on price list/ack but are NOT called out on the floor plan. Flag these as missing from layout.
 5. WALL FILLERS: Count wall fillers carefully. Check both sides of each run. Do not miscount based on label position in drawings.
 6. OPTIONAL ITEMS: Items marked optional on drawings should be noted — flag if they appear on drawings but not on price list, or vice versa, and note their optional status.
-7. Multiple layout versions, such as 30" uppers vs 36" uppers: Treat each layout version's SKUs separately. Flag when SKUs differ between versions.
+7. Multiple layout versions (e.g. 30" uppers vs 36" uppers): Treat each layout version's SKUs separately. Flag when SKUs differ between versions.
 8. If a source was not provided, put "N/A" for that source's columns.
 
-Return ONLY a JSON object. No markdown fences. Use this structure:
+Return ONLY a JSON object (no markdown fences):
 {
   "summary": {
     "total_items": number,
@@ -313,7 +253,7 @@ Return ONLY a JSON object. No markdown fences. Use this structure:
       "pricelist_val": "value from price list or N/A or —",
       "ack_val": "value from ack or N/A or —",
       "issues": ["sku","qty","price","dim","missing","design"],
-      "match": true,
+      "match": true or false,
       "note": "one sentence max 20 words explaining match or mismatch clearly"
     }
   ]
@@ -325,28 +265,15 @@ Include ALL items — both matches and mismatches. Matches should have match:tru
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({system,messages:[{role:"user",content}]})
     });
-
-    let data;
-    try{
-      data=await resp.json();
-    }catch(e){
-      throw new Error("Server did not return valid JSON. Check your server logs.");
-    }
-
-    if(!resp.ok || data.error){
-      throw new Error(data?.error?.message || `Server error ${resp.status}`);
-    }
-
-    const raw=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
-    const results=extractJson(raw);
+    const data=await resp.json();
+    if(data.error)throw new Error(data.error.message);
+    const raw=data.content.filter(b=>b.type==="text").map(b=>b.text).join("");
+    const results=JSON.parse(raw.replace(/```json|```/g,"").trim());
     renderResults(results,{hasLayout,hasPricelist,hasAck});
   } catch(e){
-    errBox.textContent=e.message || String(e);
-    errBox.style.display="block";
+    errBox.textContent=e.message;errBox.style.display="block";
   } finally{
-    btn.disabled=false;
-    btn.textContent="Run Accuracy Check";
-    updateBtn();
+    btn.disabled=false;btn.textContent="Run Accuracy Check";updateBtn();
   }
 });
 
@@ -363,16 +290,12 @@ function issueIcon(issues,match){
   if(match)return'<span class="match-icon">✅</span>';
   if(!issues||issues.length===0)return'<span class="match-icon">❌</span>';
   return(issues||[]).map(iss=>{
-    const[cls,lbl]=BADGE_MAP[iss]||["", "?"];
+    const[cls,lbl]=BADGE_MAP[iss]||["","?"];
     return`<span class="badge ${cls}">${lbl}</span>`;
   }).join(" ");
 }
 
 function renderResults(results,sources){
-  if(!results || !results.summary || !Array.isArray(results.items)){
-    throw new Error("The JSON report did not include the expected summary and items fields.");
-  }
-
   const s=results.summary;
   const sumEl=document.getElementById("summary");
   sumEl.style.display="grid";
@@ -382,12 +305,13 @@ function renderResults(results,sources){
     ["SKU / qty",(s.sku_mismatches||0)+(s.qty_mismatches||0),(s.sku_mismatches||0)+(s.qty_mismatches||0)>0],
     ["Price / spec",(s.price_mismatches||0)+(s.spec_mismatches||0),(s.price_mismatches||0)+(s.spec_mismatches||0)>0],
     ["Design errors",s.design_errors||0,(s.design_errors||0)>0]
-  ].map(([l,v,red])=>`<div class="stat-card"><div class="stat-num${red?" red":""}">${escapeHtml(v??0)}</div><div class="stat-lbl">${escapeHtml(l)}</div></div>`).join("");
+  ].map(([l,v,red])=>`<div class="stat-card"><div class="stat-num${red?" red":""}">${v??0}</div><div class="stat-lbl">${l}</div></div>`).join("");
 
   const titleEl=document.getElementById("results-title");
   titleEl.style.display="block";
   titleEl.textContent=`Discrepancy list · ${results.items.length} items`;
 
+  // Build spreadsheet
   const listEl=document.getElementById("results-list");
   if(!results.items||results.items.length===0){
     listEl.innerHTML='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px;text-align:center;font-size:14px;color:#16a34a;font-weight:500">No discrepancies found — all sources match!</div>';
@@ -404,13 +328,13 @@ function renderResults(results,sources){
     const rowClass=isDesign?"design-row":isMismatch?"mismatch-row":"match-row";
     const badges=issueIcon(it.issues,it.match);
     return`<tr class="${rowClass}">
-      <td class="sku-cell">${escapeHtml(it.sku||'')}</td>
-      <td class="desc-cell">${escapeHtml(it.description||'')}${it.room?`<br><span style="font-size:10px;color:#999">${escapeHtml(it.room)}</span>`:''}</td>
-      <td class="src-cell">${escapeHtml(it.layout_val||'—')}</td>
-      <td class="src-cell">${escapeHtml(it.pricelist_val||'—')}</td>
-      <td class="src-cell">${escapeHtml(it.ack_val||'—')}</td>
+      <td class="sku-cell">${it.sku||''}</td>
+      <td class="desc-cell">${it.description||''}${it.room?`<br><span style="font-size:10px;color:#999">${it.room}</span>`:''}</td>
+      <td class="src-cell">${it.layout_val||'—'}</td>
+      <td class="src-cell">${it.pricelist_val||'—'}</td>
+      <td class="src-cell">${it.ack_val||'—'}</td>
       <td style="text-align:center">${badges}</td>
-      <td class="note-cell">${escapeHtml(it.note||'')}</td>
+      <td class="note-cell">${it.note||''}</td>
     </tr>`;
   }).join("");
 
@@ -418,9 +342,9 @@ function renderResults(results,sources){
     <thead><tr>
       <th>SKU</th>
       <th>Description</th>
-      <th class="center">${escapeHtml(layoutHdr)}</th>
-      <th class="center">${escapeHtml(priceHdr)}</th>
-      <th class="center">${escapeHtml(ackHdr)}</th>
+      <th class="center">${layoutHdr}</th>
+      <th class="center">${priceHdr}</th>
+      <th class="center">${ackHdr}</th>
       <th class="center">Status</th>
       <th>Notes</th>
     </tr></thead>
