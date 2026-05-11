@@ -45,7 +45,7 @@ app.post("/api/check", async (req, res) => {
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: req.body.system,
       messages: req.body.messages
     });
